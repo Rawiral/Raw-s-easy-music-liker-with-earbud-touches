@@ -1,0 +1,39 @@
+name: Build APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Extract Android project
+        run: |
+          unzip -o RawsLiker.zip -d "$RUNNER_TEMP/android-project"
+          echo "ANDROID_PROJECT_DIR=$(find "$RUNNER_TEMP/android-project" -maxdepth 2 -name . -o -type d -name 'EarbudLikerLite' | head -n 1)" >> "$GITHUB_ENV"
+
+      - name: Build APK
+        run: |
+          cd "$ANDROID_PROJECT_DIR"
+          ./gradlew assembleDebug
+          ls -R app/build/outputs/apk/debug
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: EarbudLikerLite-debug-apk
+          path: |
+            ${{ env.ANDROID_PROJECT_DIR }}/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
