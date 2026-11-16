@@ -10,30 +10,45 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up JDK 17
+      - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      - name: Extract Android project
+      - name: Extract Android project from ZIP
+        shell: bash
         run: |
+          mkdir -p "$RUNNER_TEMP/android-project"
           unzip -o RawsLiker.zip -d "$RUNNER_TEMP/android-project"
-          echo "ANDROID_PROJECT_DIR=$(find "$RUNNER_TEMP/android-project" -maxdepth 2 -name . -o -type d -name 'EarbudLikerLite' | head -n 1)" >> "$GITHUB_ENV"
+
+          project_dir=$(find "$RUNNER_TEMP/android-project" -type f \( -name "settings.gradle" -o -name "settings.gradle.kts" \) -print -quit | xargs -r dirname)
+
+          if [ -z "$project_dir" ]; then
+            echo "No Android project found in RawsLiker.zip"
+            exit 1
+          fi
+
+          echo "PROJECT_DIR=$project_dir" >> "$GITHUB_ENV"
+
+      - name: Install Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
 
       - name: Build APK
+        shell: bash
         run: |
-          cd "$ANDROID_PROJECT_DIR"
-          ./gradlew assembleDebug
-          ls -R app/build/outputs/apk/debug
+          cd "$PROJECT_DIR"
+          gradle assembleDebug --stacktrace
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: EarbudLikerLite-debug-apk
           path: |
-            ${{ env.ANDROID_PROJECT_DIR }}/app/build/outputs/apk/debug/*.apk
+            ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
